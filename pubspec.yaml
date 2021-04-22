@@ -11,7 +11,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  asn1lib: ^0.8.1
+  asn1lib: ^1.0.0
   pointycastle: ^3.0.1
 
 dev_dependencies:
