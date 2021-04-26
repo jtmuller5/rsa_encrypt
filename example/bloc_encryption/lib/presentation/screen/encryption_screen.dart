@@ -7,7 +7,7 @@ import 'package:pointycastle/api.dart';
 class EncryptionScreen extends StatefulWidget {
   final AsymmetricKeyPair _asymmetricKeyPair;
   const EncryptionScreen(
-      {Key key, @required AsymmetricKeyPair asymmetricKeyPair})
+      {Key? key, required AsymmetricKeyPair? asymmetricKeyPair})
       : assert(asymmetricKeyPair != null),
         _asymmetricKeyPair = asymmetricKeyPair,
         super(key: key);

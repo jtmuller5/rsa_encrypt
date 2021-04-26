@@ -14,8 +14,7 @@ class RsaKeyHelper {
   ///
   /// Returns a [AsymmetricKeyPair] based on the [RSAKeyGenerator] with custom parameters,
   /// including a [SecureRandom]
-  Future<AsymmetricKeyPair<PublicKey, PrivateKey>> computeRSAKeyPair(
-      SecureRandom secureRandom) async {
+  Future<AsymmetricKeyPair<PublicKey, PrivateKey>> computeRSAKeyPair(SecureRandom secureRandom) async {
     return await compute(getRsaKeyPair, secureRandom);
   }
 
@@ -67,14 +66,17 @@ class RsaKeyHelper {
     } else {
       var publicKeyBitString = topLevelSeq.elements[1];
 
-      var publicKeyAsn = new ASN1Parser(publicKeyBitString.contentBytes()!);
-      ASN1Sequence publicKeySeq = publicKeyAsn.nextObject() as ASN1Sequence;
-      modulus = publicKeySeq.elements[0] as ASN1Integer;
-      exponent = publicKeySeq.elements[1] as ASN1Integer;
+      Uint8List? publicKeyBytes = publicKeyBitString.contentBytes();
+
+      if (publicKeyBytes != null) {
+        var publicKeyAsn = new ASN1Parser(publicKeyBytes);
+        ASN1Sequence publicKeySeq = publicKeyAsn.nextObject() as ASN1Sequence;
+        modulus = publicKeySeq.elements[0] as ASN1Integer;
+        exponent = publicKeySeq.elements[1] as ASN1Integer;
+      }
     }
 
-    RSAPublicKey rsaPublicKey =
-        RSAPublicKey(modulus.valueAsBigInteger, exponent.valueAsBigInteger);
+    RSAPublicKey rsaPublicKey = RSAPublicKey(modulus.valueAsBigInteger, exponent.valueAsBigInteger);
 
     return rsaPublicKey;
   }
@@ -86,8 +88,7 @@ class RsaKeyHelper {
   String sign(String plainText, RSAPrivateKey privateKey) {
     var signer = RSASigner(SHA256Digest(), "0609608648016503040201");
     signer.init(true, PrivateKeyParameter<RSAPrivateKey>(privateKey));
-    return base64Encode(
-        signer.generateSignature(createUint8ListFromString(plainText)).bytes);
+    return base64Encode(signer.generateSignature(createUint8ListFromString(plainText)).bytes);
   }
 
   /// Creates a [Uint8List] from a string to be signed
@@ -110,13 +111,17 @@ class RsaKeyHelper {
     if (topLevelSeq.elements.length == 3) {
       var privateKey = topLevelSeq.elements[2];
 
-      asn1Parser = new ASN1Parser(privateKey.contentBytes()!);
-      var pkSeq = asn1Parser.nextObject() as ASN1Sequence;
+      Uint8List? privateKeyBytes = privateKey.contentBytes();
 
-      modulus = pkSeq.elements[1] as ASN1Integer;
-      privateExponent = pkSeq.elements[3] as ASN1Integer;
-      p = pkSeq.elements[4] as ASN1Integer;
-      q = pkSeq.elements[5] as ASN1Integer;
+      if (privateKeyBytes != null) {
+        asn1Parser = new ASN1Parser(privateKeyBytes);
+        var pkSeq = asn1Parser.nextObject() as ASN1Sequence;
+
+        modulus = pkSeq.elements[1] as ASN1Integer;
+        privateExponent = pkSeq.elements[3] as ASN1Integer;
+        p = pkSeq.elements[4] as ASN1Integer;
+        q = pkSeq.elements[5] as ASN1Integer;
+      }
     } else {
       modulus = topLevelSeq.elements[1] as ASN1Integer;
       privateExponent = topLevelSeq.elements[3] as ASN1Integer;
@@ -124,11 +129,8 @@ class RsaKeyHelper {
       q = topLevelSeq.elements[5] as ASN1Integer;
     }
 
-    RSAPrivateKey rsaPrivateKey = RSAPrivateKey(
-        modulus.valueAsBigInteger,
-        privateExponent.valueAsBigInteger,
-        p.valueAsBigInteger,
-        q.valueAsBigInteger);
+    RSAPrivateKey rsaPrivateKey =
+        RSAPrivateKey(modulus.valueAsBigInteger, privateExponent.valueAsBigInteger, p.valueAsBigInteger, q.valueAsBigInteger);
 
     return rsaPrivateKey;
   }
@@ -188,28 +190,55 @@ class RsaKeyHelper {
   String encodePrivateKeyToPemPKCS1(RSAPrivateKey privateKey) {
     var topLevel = new ASN1Sequence();
 
-    var version = ASN1Integer(BigInt.from(0));
-    var modulus = ASN1Integer(privateKey.n!);
-    var publicExponent = ASN1Integer(privateKey.exponent!);
-    var privateExponent = ASN1Integer(privateKey.privateExponent!);
-    var p = ASN1Integer(privateKey.p!);
-    var q = ASN1Integer(privateKey.q!);
-    var dP = privateKey.privateExponent! % (privateKey.p! - BigInt.from(1));
-    var exp1 = ASN1Integer(dP);
-    var dQ = privateKey.privateExponent! % (privateKey.q! - BigInt.from(1));
-    var exp2 = ASN1Integer(dQ);
-    var iQ = privateKey.q!.modInverse(privateKey.p!);
-    var co = ASN1Integer(iQ);
+    BigInt? privateKeyN = privateKey.n;
+    BigInt? privateKeyExponent = privateKey.exponent;
+    BigInt? privateKeyP = privateKey.p;
+    BigInt? privateKeyQ = privateKey.q;
+
+    ASN1Integer? version;
+    ASN1Integer? modulus;
+    ASN1Integer? publicExponent;
+    ASN1Integer? privateExponent;
+    ASN1Integer? p;
+    ASN1Integer? q;
+    ASN1Integer? exp1;
+    ASN1Integer? exp2;
+    ASN1Integer? co;
+    BigInt? dP;
+    BigInt? dQ;
+    BigInt? iQ;
+
+    version = ASN1Integer(BigInt.from(0));
+
+    if (privateKeyN != null) modulus = ASN1Integer(privateKeyN);
+    if (privateKeyExponent != null) {
+      publicExponent = ASN1Integer(privateKeyExponent);
+      privateExponent = ASN1Integer(privateKeyExponent);
+    }
+    if (privateKeyP != null) p = ASN1Integer(privateKeyP);
+    if (privateKeyQ != null) q = ASN1Integer(privateKeyQ);
+    if (privateKeyP != null && privateKeyExponent != null) {
+      dP = privateKeyExponent % (privateKeyP - BigInt.from(1));
+      exp1 = ASN1Integer(dP);
+    }
+    if (privateKeyQ != null && privateKeyExponent != null) {
+      dQ = privateKeyExponent % (privateKeyQ - BigInt.from(1));
+      exp2 = ASN1Integer(dQ);
+      if (privateKeyP != null) {
+        iQ = privateKeyQ.modInverse(privateKeyP);
+        co = ASN1Integer(iQ);
+      }
+    }
 
     topLevel.add(version);
-    topLevel.add(modulus);
-    topLevel.add(publicExponent);
-    topLevel.add(privateExponent);
-    topLevel.add(p);
-    topLevel.add(q);
-    topLevel.add(exp1);
-    topLevel.add(exp2);
-    topLevel.add(co);
+    if(modulus != null) topLevel.add(modulus);
+    if(publicExponent != null) topLevel.add(publicExponent);
+    if(privateExponent != null) topLevel.add(privateExponent);
+    if(exp1 != null) topLevel.add(exp1);
+    if(exp2 != null) topLevel.add(exp2);
+    if(p != null) topLevel.add(p);
+    if(q != null) topLevel.add(q);
+    if(co != null) topLevel.add(co);
 
     var dataBase64 = base64.encode(topLevel.encodedBytes);
 
@@ -232,8 +261,7 @@ class RsaKeyHelper {
 
 /// Encrypting String
 String encrypt(String plaintext, RSAPublicKey publicKey) {
-  var cipher = new RSAEngine()
-    ..init(true, new PublicKeyParameter<RSAPublicKey>(publicKey));
+  var cipher = new RSAEngine()..init(true, new PublicKeyParameter<RSAPublicKey>(publicKey));
   var cipherText = cipher.process(new Uint8List.fromList(plaintext.codeUnits));
 
   return new String.fromCharCodes(cipherText);
@@ -241,8 +269,7 @@ String encrypt(String plaintext, RSAPublicKey publicKey) {
 
 /// Decrypting String
 String decrypt(String ciphertext, RSAPrivateKey privateKey) {
-  var cipher = new RSAEngine()
-    ..init(false, new PrivateKeyParameter<RSAPrivateKey>(privateKey));
+  var cipher = new RSAEngine()..init(false, new PrivateKeyParameter<RSAPrivateKey>(privateKey));
   var decrypted = cipher.process(new Uint8List.fromList(ciphertext.codeUnits));
 
   return new String.fromCharCodes(decrypted);
@@ -252,8 +279,7 @@ String decrypt(String ciphertext, RSAPrivateKey privateKey) {
 ///
 /// Returns a [AsymmetricKeyPair] based on the [RSAKeyGenerator] with custom parameters,
 /// including a [SecureRandom]
-AsymmetricKeyPair<PublicKey, PrivateKey> getRsaKeyPair(
-    SecureRandom secureRandom) {
+AsymmetricKeyPair<PublicKey, PrivateKey> getRsaKeyPair(SecureRandom secureRandom) {
   /// Set BitStrength to [1024, 2048 or 4096]
   var rsapars = new RSAKeyGeneratorParameters(BigInt.from(65537), 2048, 5);
   var params = new ParametersWithRandom(rsapars, secureRandom);
