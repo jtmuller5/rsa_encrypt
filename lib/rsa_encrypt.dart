@@ -191,7 +191,8 @@ class RsaKeyHelper {
     var topLevel = new ASN1Sequence();
 
     BigInt? privateKeyN = privateKey.n;
-    BigInt? privateKeyExponent = privateKey.exponent;
+    BigInt? publicExponentInt = privateKey.exponent;
+    BigInt? privateExponentInt = privateKey.privateExponent;
     BigInt? privateKeyP = privateKey.p;
     BigInt? privateKeyQ = privateKey.q;
 
@@ -211,18 +212,16 @@ class RsaKeyHelper {
     version = ASN1Integer(BigInt.from(0));
 
     if (privateKeyN != null) modulus = ASN1Integer(privateKeyN);
-    if (privateKeyExponent != null) {
-      publicExponent = ASN1Integer(privateKeyExponent);
-      privateExponent = ASN1Integer(privateKeyExponent);
-    }
+    if (publicExponentInt != null) publicExponent = ASN1Integer(publicExponentInt);
+    if(privateExponentInt != null) privateExponent = ASN1Integer(privateExponentInt);
     if (privateKeyP != null) p = ASN1Integer(privateKeyP);
     if (privateKeyQ != null) q = ASN1Integer(privateKeyQ);
-    if (privateKeyP != null && privateKeyExponent != null) {
-      dP = privateKeyExponent % (privateKeyP - BigInt.from(1));
+    if (privateKeyP != null && privateExponentInt != null) {
+      dP = privateExponentInt % (privateKeyP - BigInt.from(1));
       exp1 = ASN1Integer(dP);
     }
-    if (privateKeyQ != null && privateKeyExponent != null) {
-      dQ = privateKeyExponent % (privateKeyQ - BigInt.from(1));
+    if (privateKeyQ != null && privateExponentInt != null) {
+      dQ = privateExponentInt % (privateKeyQ - BigInt.from(1));
       exp2 = ASN1Integer(dQ);
       if (privateKeyP != null) {
         iQ = privateKeyQ.modInverse(privateKeyP);
